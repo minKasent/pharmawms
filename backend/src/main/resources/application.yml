@@ -1,0 +1,125 @@
+spring:
+  application:
+    name: pharmawms
+  threads:
+    virtual:
+      enabled: ${VIRTUAL_THREADS_ENABLED:true}
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pharmawms}
+    username: ${DB_USERNAME:pharmawms}
+    password: ${DB_PASSWORD:pharmawms}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+      repositories:
+        enabled: false
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
+      key-prefix: "pharmawms:cache:"
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+  shutdown: graceful
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    redis:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 4
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
+          - vn.edu.hcmunre.pharmawms.forecasting.internal.ai.AiForecastClient$ModelNotTrainedException
+  retry:
+    instances:
+      aiService:
+        max-attempts: 2
+        wait-duration: 500ms
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+
+pharmawms:
+  time-zone: Asia/Ho_Chi_Minh
+  security:
+    jwt:
+      issuer: pharmawms
+      access-token-ttl: 15m
+      refresh-token-ttl: 7d
+      refresh-reuse-grace: 10s
+      private-key-pem: ${JWT_PRIVATE_KEY_PEM:}
+      public-key-pem: ${JWT_PUBLIC_KEY_PEM:}
+    login-rate-limit:
+      max-failed-attempts: 5
+      window: 5m
+  demo:
+    enabled: ${DEMO_ENABLED:true}
+    password: ${DEMO_PASSWORD:Demo@123}
+  inventory:
+    expiry-job-cron: "0 5 0 * * *"
+    default-min-remaining-shelf-life-days: 90
+  ai:
+    base-url: ${AI_BASE_URL:http://localhost:8000}
+    api-key: ${AI_API_KEY:dev-internal-key}
+    connect-timeout: 2s
+    read-timeout: 60s
+  forecasting:
+    enabled: ${FORECASTING_ENABLED:true}
+    cron: "0 0 1 * * *"
+    horizon-days: 28
+    review-period-days: 7
+    history-days: 730
+    retrain-after: 7d
+    training-timeout: 15m
+    default-lead-time-days: 7
+    service-levels:
+      a: 0.98
+      b: 0.95
+      c: 0.90
