@@ -1,0 +1,53 @@
+{
+  "simulation_days": 180,
+  "warmup_days": 545,
+  "product_count": 56,
+  "seed": 2026,
+  "elapsed_seconds": 4.14,
+  "policies": [
+    {
+      "code": "P0",
+      "name": "Min/Max cố định (14–42 ngày)",
+      "fill_rate_pct": 96.11,
+      "stockout_days": 387,
+      "expired_value_vnd": 860339950,
+      "avg_inventory_value_vnd": 659707781,
+      "total_orders": 117,
+      "total_demand_units": 1953025,
+      "fulfilled_units": 1877094
+    },
+    {
+      "code": "P1",
+      "name": "(R, s, S) + Moving Average (28/91 ngày)",
+      "fill_rate_pct": 98.04,
+      "stockout_days": 173,
+      "expired_value_vnd": 269926120,
+      "avg_inventory_value_vnd": 481872503,
+      "total_orders": 150,
+      "total_demand_units": 1953025,
+      "fulfilled_units": 1914679
+    },
+    {
+      "code": "P2",
+      "name": "(R, s, S) + LightGBM AI",
+      "fill_rate_pct": 98.63,
+      "stockout_days": 109,
+      "expired_value_vnd": 113511900,
+      "avg_inventory_value_vnd": 471734424,
+      "total_orders": 149,
+      "total_demand_units": 1953025,
+      "fulfilled_units": 1926201
+    },
+    {
+      "code": "P3",
+      "name": "(R, s, S) + LightGBM AI + Expiry-Aware",
+      "fill_rate_pct": 99.66,
+      "stockout_days": 43,
+      "expired_value_vnd": 1601450,
+      "avg_inventory_value_vnd": 398095427,
+      "total_orders": 150,
+      "total_demand_units": 1953025,
+      "fulfilled_units": 1946305
+    }
+  ]
+}
