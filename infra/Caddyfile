@@ -1,0 +1,12 @@
+minkas.tech, www.minkas.tech {
+	encode zstd gzip
+
+	@BackendDocs path /api/v1/* /swagger-ui* /v3/api-docs* /actuator/health
+	handle @BackendDocs {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
