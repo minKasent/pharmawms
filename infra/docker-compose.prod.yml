@@ -1,0 +1,115 @@
+name: pharmawms
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pharmawms
+      POSTGRES_USER: pharmawms
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pharmawms}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pharmawms -d pharmawms"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ai:
+    build:
+      context: ../ai-service
+    restart: unless-stopped
+    environment:
+      AI_API_KEY: ${AI_API_KEY:-dev-internal-key}
+      AI_MODEL_DIR: /data/models
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ai-models:/data/models
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/pharmawms
+      DB_USERNAME: pharmawms
+      DB_PASSWORD: ${DB_PASSWORD:-pharmawms}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AI_BASE_URL: http://ai:8000
+      AI_API_KEY: ${AI_API_KEY:-dev-internal-key}
+      DEMO_ENABLED: ${DEMO_ENABLED:-true}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo@123}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM:-}
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        BACKEND_URL: http://backend:8080
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:8080
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TZ: Asia/Ho_Chi_Minh
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  ai-models:
+  caddy-data:
+  caddy-config:

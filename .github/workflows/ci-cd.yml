@@ -1,0 +1,221 @@
+name: PharmaWMS CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_to_azure:
+        description: "Deploy to Azure (https://minkas.tech)"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend-ci:
+    name: Backend (Spring Boot)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Run Maven verify
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-reports
+          path: |
+            backend/target/site/jacoco/
+            backend/target/spring-modulith-docs/
+          retention-days: 14
+
+  ai-service-ci:
+    name: AI Service (FastAPI)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libgomp1
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: python -m pytest -v
+
+  frontend-ci:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint & typecheck
+        run: |
+          npm run lint
+          npm run typecheck
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production bundle
+        env:
+          BACKEND_URL: http://backend:8080
+        run: npm run build
+
+  e2e-smoke:
+    name: E2E Smoke Tests
+    runs-on: ubuntu-24.04
+    needs: [backend-ci, ai-service-ci, frontend-ci]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start Docker Compose stack
+        run: |
+          cp infra/.env.example infra/.env
+          docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
+
+      - name: Wait for services
+        run: |
+          for i in {1..60}; do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' pharmawms-backend-1 2>/dev/null || echo "starting")
+            if [ "$STATUS" = "healthy" ]; then
+              break
+            fi
+            sleep 3
+          done
+          curl -fsS http://localhost:8080/actuator/health
+
+      - name: Seed and run smoke tests
+        run: |
+          python3 scripts/datagen/seed.py --container pharmawms-postgres-1 --redis-container pharmawms-redis-1
+          python3 scripts/smoke_test.py --base http://localhost:8080/api/v1
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v
+
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-24.04
+    needs: [e2e-smoke]
+    if: >
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_to_azure == true)
+    environment:
+      name: production
+      url: https://minkas.tech
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync and restart containers on Azure VM
+        env:
+          AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+        run: |
+          if [ -z "$AZURE_VM_SSH_KEY" ]; then
+            exit 0
+          fi
+          HOST="${AZURE_VM_HOST:-85.211.247.249}"
+          USER="${AZURE_VM_USER:-azureuser}"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$AZURE_VM_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+
+          ssh "${USER}@${HOST}" "sudo mkdir -p /home/${USER}/pharmawms && sudo chown -R ${USER}:${USER} /home/${USER}/pharmawms"
+
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '__pycache__' \
+            --exclude 'infra/.env' \
+            --exclude 'backend/target' \
+            --exclude 'frontend/node_modules' \
+            --exclude 'frontend/.next' \
+            --exclude 'ai-service/.venv' \
+            ./ "${USER}@${HOST}:/home/${USER}/pharmawms/"
+
+          ssh "${USER}@${HOST}" "sudo bash -s" << 'EOF'
+            set -euo pipefail
+            cd /home/azureuser/pharmawms
+            chmod +x infra/deploy-azure.sh infra/backup-db.sh
+            ./infra/backup-db.sh || true
+            docker compose --env-file infra/.env -f infra/docker-compose.prod.yml up -d --build --remove-orphans
+            docker exec pharmawms-caddy-1 caddy reload --config /etc/caddy/Caddyfile || true
+            for i in {1..60}; do
+              BE=$(docker inspect --format='{{.State.Health.Status}}' pharmawms-backend-1 2>/dev/null || echo "starting")
+              FE=$(docker inspect --format='{{.State.Health.Status}}' pharmawms-frontend-1 2>/dev/null || echo "starting")
+              if [ "$BE" = "healthy" ] && [ "$FE" = "healthy" ]; then
+                break
+              fi
+              sleep 3
+            done
+            docker image prune -f
+          EOF
+
+      - name: Healthcheck
+        run: |
+          curl -fsS https://minkas.tech/actuator/health | grep -q '"status":"UP"'
+          curl -fsSI https://minkas.tech/login | head -n 1
+          curl -fsS https://minkas.tech/v3/api-docs | grep -q '"https://minkas.tech"'

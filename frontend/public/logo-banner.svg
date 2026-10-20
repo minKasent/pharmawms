@@ -1,0 +1,49 @@
+<svg width="880" height="168" viewBox="0 0 880 168" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="banner-bg" x1="0" y1="0" x2="880" y2="168" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f3d36" />
+      <stop offset="55%" stop-color="#11564d" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="mark-bg" x1="28" y1="24" x2="140" y2="144" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14b8a6" />
+      <stop offset="55%" stop-color="#0e8573" />
+      <stop offset="100%" stop-color="#0f5248" />
+    </linearGradient>
+    <linearGradient id="mark-top" x1="48" y1="36" x2="120" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5eead4" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#14b8a6" stop-opacity="0.1" />
+    </linearGradient>
+  </defs>
+
+  <rect width="880" height="168" rx="24" fill="url(#banner-bg)" />
+  <circle cx="810" cy="32" r="110" fill="#14b8a6" fill-opacity="0.08" />
+  <circle cx="740" cy="148" r="85" fill="#38bdf8" fill-opacity="0.06" />
+
+  <!-- Brand Emblem -->
+  <g transform="translate(28, 22) scale(1.9375)">
+    <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#mark-bg)" stroke="#99f6e4" stroke-opacity="0.4" stroke-width="1.5" />
+    <path d="M32 9L52 20.5V43.5L32 55L12 43.5V20.5L32 9Z" fill="#0b3b34" fill-opacity="0.38" stroke="#5eead4" stroke-opacity="0.3" stroke-width="1.2" />
+    <path d="M32 9L52 20.5L32 32L12 20.5L32 9Z" fill="url(#mark-top)" />
+    <path d="M32 32V55" stroke="#5eead4" stroke-opacity="0.22" stroke-width="1.2" />
+    <path d="M28 19C28 17.8954 28.8954 17 30 17H34C35.1046 17 36 17.8954 36 19V28H45C46.1046 28 47 28.8954 47 30V34C47 35.1046 46.1046 36 45 36H36V45C36 46.1046 35.1046 47 34 47H30C28.8954 47 28 46.1046 28 45V36H19C17.8954 36 17 35.1046 17 34V30C17 28.8954 17.8954 28 19 28H28V19Z" fill="#ffffff" />
+    <path d="M23 34L28.5 30.5L33.5 33L41 25.5" stroke="#0e8573" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="41" cy="25.5" r="2.6" fill="#10b981" stroke="#ffffff" stroke-width="1.2" />
+  </g>
+
+  <!-- Typography Lockup -->
+  <text x="176" y="74" fill="#ffffff" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="42" font-weight="800" letter-spacing="-0.03em">
+    Pharma<tspan fill="#5eead4">WMS</tspan>
+  </text>
+  <rect x="444" y="45" width="168" height="30" rx="15" fill="#14b8a6" fill-opacity="0.2" stroke="#5eead4" stroke-opacity="0.4" />
+  <text x="528" y="65" text-anchor="middle" fill="#99f6e4" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" letter-spacing="0.06em">
+    GSP · FEFO · AI (s, S)
+  </text>
+
+  <text x="176" y="108" fill="#ccfbf1" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="18" font-weight="500">
+    Hệ thống Quản lý Kho Dược Bệnh viện Chuẩn GSP &amp; Dự báo Nhu cầu bằng AI LightGBM
+  </text>
+  <text x="176" y="136" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="500">
+    Spring Boot 4.1 Modulith  ·  FastAPI LightGBM + SHAP  ·  Next.js 16 BFF  ·  PostgreSQL 17
+  </text>
+</svg>
